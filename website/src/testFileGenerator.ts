@@ -32,7 +32,10 @@ class App {
   modules: { declarationType: string;
     name: string;
     node: Node
-    type: string;}[] = [];
+    type: string;
+    params?: any[];
+    isAsync?: boolean;
+  }[] = [];
   selectedModuleName = '';
   selectedModuleParams: Node[] = [];
   //@ts-ignore
@@ -76,17 +79,17 @@ class LogicalBranchesGenerator {
       this.generateBranchesByTestNode(testNode.right, false);
     } else {
       this._logicalBranches.push({
-        name: '`' + generate(testNode).code + ' returns true' + '`'
+        name: '`' + generate(testNode).code + ' returns true' + ' - optional`'
       })
       this._logicalBranches.push({
-        name: '`' + generate(testNode).code + ' returns false' + '`'
+        name: '`' + generate(testNode).code + ' returns false' + '` - optional'
       })
     }
   }
 
   private generateTestCases = () => {
     this._logicalBranches.forEach((branch) => {
-      const itName = `should work when ${branch.name.replace(/'/g, '`').replace(/\n/g, ' ')}`;
+      const itName = `Should work when ${branch.name.replace(/'/g, '`').replace(/\n/g, ' ')}`;
 
       const it = new It(itName);
       it.generateStructure();
@@ -117,11 +120,13 @@ class Describe {
     this._testCases.push(testCase);
   }
 
-  finish = () => {
+  finish = (): string => {
     return `describe('${this._description}', () => {
       beforeEach(async () => {});
 
       ${this._testCases.map((it) => it.finish()).join(LINE_BREAK_DOUBLE)}
+
+      ${this._describes.map((describe) => describe.finish()).join(LINE_BREAK_DOUBLE)}
     })`
   }
 }
@@ -229,12 +234,15 @@ const getModules = () => {
         }
         // @ts-ignore
         if (path.node.declaration.declarations) {
+          // VariableDeclaration
           // @ts-ignore
           path.node.declaration.declarations.forEach((declaration) => {
             APP.modules.push({
               declarationType: declaration.id.type,
               name: declaration.id.name,
-              node: path.node,
+              node: declaration.init,
+              params: declaration.init.params,
+              isAsync: declaration.init.async,
               type: path.node.type,
             });
           });
@@ -250,6 +258,9 @@ const getModules = () => {
             });
           });
         }
+        /*if (path.node.declaration?.type === 'VariableDeclaration') {
+
+        }*/
       },
       ExportDefaultDeclaration(path: NodePath<ExportDefaultDeclaration>) {
         if (path.node.declaration.type === 'Identifier') {
@@ -286,7 +297,7 @@ const getNodes = () => {
       },
       TryStatement: {
         enter: () => {
-          const itName = `Error handling - should execute catch for try number ${APP.tryCatchCases.length}`;
+          const itName = `Error handling - should execute catch for try number ${APP.tryCatchCases.length + 1}`;
 
           const uniTestCase = new It(itName);
           uniTestCase.generateStructure();
@@ -309,16 +320,16 @@ const buildTestFile = (sourceCode: string, functionName: string) => {
 
   // Set selected module values
   const selectedModule = APP.modules.find(({ name }) => name === functionName);
-
+  console.log(selectedModule)
   if (!selectedModule) {
     return 'WRONG FUNCTION NAME'
   }
 
   APP.selectedModuleName = selectedModule.name
   // @ts-ignore
-  APP.selectedModuleParams = selectedModule.node.declaration.params;
+  APP.selectedModuleParams = selectedModule.params || selectedModule.node.declaration.params;
   // @ts-ignore
-  APP.isAsync = selectedModule.node.declaration.async;
+  APP.isAsync = typeof selectedModule.isAsync === 'boolean' ? selectedModule.isAsync : selectedModule.node.declaration.async;
 
   // Generate main describe
   APP.testSuite = new Describe(`Module ${APP.selectedModuleName}`)

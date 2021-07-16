@@ -4,7 +4,7 @@ export const logger = {
 
 const BASE_LOGGER_MESSAGE = 'abc';
 
-export async function isInvalidValue(a: string, b: string) {
+export function isInvalidValue(a: string, b: string) {
   let isInvalid = false;
   const megaInvalid = a === BASE_LOGGER_MESSAGE ? true : false;
 
@@ -31,6 +31,11 @@ export async function isInvalidValue2(a, b, {c = '33', d = '48'} : {c: string; d
     if (!a && !b) {
       console.log('invalid')
       isInvalid = true;
+      if (a) {
+        console.log('invalid/2')
+      } else if (b) {
+        console.log('invalid/2')
+      }
     } else {
       console.log('valid')
     }
@@ -40,4 +45,20 @@ export async function isInvalidValue2(a, b, {c = '33', d = '48'} : {c: string; d
 
 
   return megaInvalid && isInvalid;
+}
+
+export const isInvalidValue3 = (a: string) => {
+  let isInvalid = false;
+
+  try {
+    if (!a) {
+      console.log('invalid')
+      isInvalid = true;
+    }
+  } catch (error) {
+    console.error('error');
+  }
+
+
+  return isInvalid;
 }
