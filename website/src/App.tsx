@@ -1,4 +1,11 @@
-import { Button, Card, Col, Divider, Form, Layout, Image, Input, Row, Space, Typography } from 'antd';
+import { useState } from 'react';
+import { Button, Card, Divider, Form, Layout, Image, Input, Space, Typography } from 'antd';
+
+import Editor from "react-simple-code-editor";
+// @ts-ignore
+import { highlight, languages } from "prismjs/components/prism-core";
+import "prismjs/components/prism-clike";
+import "prismjs/components/prism-javascript";
 
 import exampleImage from './example.gif';
 import testFileGenerator from './testFileGenerator';
@@ -32,9 +39,12 @@ export const isValid = (param1: string) => {
 
 function App() {
   const [form] = Form.useForm();
+  const [code, setCode] = useState('');
+  const [generatedCode, setGeneratedCode] = useState(
+    `The test file will be added here`
+  );
 
   const generateUnitTestCases = () => {
-    const code = (document.getElementById('code') as HTMLInputElement).value;
     const functionName = (document.getElementById('functionName') as HTMLInputElement).value;
 
     let finalCode = '';
@@ -44,8 +54,7 @@ function App() {
       finalCode = 'MISSING PARAMETERS'
     }
 
-    //(document.getElementById('generated') as HTMLInputElement).value = finalCode;
-    form.setFieldsValue({ generated: finalCode });
+    setGeneratedCode(finalCode);
   }
 
   return (
@@ -61,15 +70,34 @@ function App() {
         <Content className="background-color">
           <Form form={form} onFinish={generateUnitTestCases}>
 
-          <div>
-            <Space size="middle" align="center">
-              <Input.TextArea name="code" id="code" rows={35} cols={100} placeholder={placeholder} required showCount />
-              <Form.Item name="generated">
-                <Input.TextArea id="generated" rows={35} cols={100} value="The test file will be added here" readOnly showCount />
-              </Form.Item>
-            </Space>
-          </div>
+            <div>
+              <Space size="middle" align="center">
+                <div className="code-editor-container">
+                  <Editor
+                    value={code}
+                    onValueChange={(_code) => setCode(_code)}
+                    highlight={(_code) => highlight(_code, languages.js)}
+                    padding={10}
+                    className="code-editor"
+                    placeholder={placeholder}
+                  />
+                </div>
+                <div className="code-editor-container">
+                  <Editor
+                    value={generatedCode}
+                    onValueChange={(_code) => setGeneratedCode(_code)}
+                    highlight={(_code) => highlight(_code, languages.js)}
+                    padding={10}
+                    className="code-editor"
+                    placeholder={placeholder}
+                    readOnly
+                  />
+                </div>
+              </Space>
+            </div>
 
+            <br />
+            
             <Space>
               <Card className="background-color">
                 <Space size="middle" align="center" direction="vertical">

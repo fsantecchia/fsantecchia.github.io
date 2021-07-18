@@ -1,10 +1,31 @@
 @import '~antd/dist/antd.dark.css';
+@import './prism-theme-vsc.css';
 
 .App {
-  text-align: center;
   color: #FFF;
+  text-align: center;
 }
 
 .background-color {
   background-color: #171819;
 }
+
+.code-editor-container {
+  background-color: #1E2021;
+  border: solid 1px #434343;
+  height: 775px;
+  overflow: auto;
+}
+
+.code-editor {
+  font-family: "Fira code", "Fira Mono", monospace;
+  font-size: 13px;
+  width: 700px;
+  min-height: 770px;
+}
+
+/*textarea::selection {
+  background-color: black !important;
+  color: white !important;
+}*/
+

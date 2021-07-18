@@ -62,3 +62,21 @@ export const isInvalidValue3 = (a: string) => {
 
   return isInvalid;
 }
+
+function isInvalidValue4(a: string) {
+  let isInvalid = false;
+
+  try {
+    if (!a) {
+      console.log('invalid')
+      isInvalid = true;
+    }
+  } catch (error) {
+    console.error('error');
+  }
+
+
+  return isInvalid;
+}
+
+export default isInvalidValue4;
