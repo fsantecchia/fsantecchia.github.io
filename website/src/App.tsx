@@ -7,7 +7,7 @@ import { highlight, languages } from "prismjs/components/prism-core";
 import "prismjs/components/prism-clike";
 import "prismjs/components/prism-javascript";
 
-import exampleImage from './example.gif';
+//import exampleImage from './example.gif';
 import testFileGenerator from './testFileGenerator';
 import './App.css';
 
@@ -122,7 +122,7 @@ function App() {
               How to use
             </Typography.Title>
 
-            <Image src={exampleImage} width={1280} height={720} />
+            {/*<Image src={exampleImage} width={1280} height={720} />*/}
           </Space>
 
         </Content>
