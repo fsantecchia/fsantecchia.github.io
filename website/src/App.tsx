@@ -18,7 +18,7 @@ const placeholder = `Write your code here
 2 - Fill the input below
 3 - Press "Generate file" button
 
-Example 1: 
+Example 1:
 export function isValid(param1: string) {
   let isInvalid = false;
   if (!param1) {
@@ -27,7 +27,7 @@ export function isValid(param1: string) {
   return isInvalid;
 }
 
-Example 2: 
+Example 2:
 export const isValid = (param1: string) => {
   let isInvalid = false;
   if (!param1) {
@@ -97,7 +97,7 @@ function App() {
             </div>
 
             <br />
-            
+
             <Space>
               <Card className="background-color">
                 <Space size="middle" align="center" direction="vertical">
@@ -117,13 +117,13 @@ function App() {
 
           <Divider />
 
-          <Space size="middle" align="center" direction="vertical">
+          {/*<Space size="middle" align="center" direction="vertical">
             <Typography.Title level={2}>
               How to use
             </Typography.Title>
 
-            {/*<Image src={exampleImage} width={1280} height={720} />*/}
-          </Space>
+            <Image src={exampleImage} width={1280} height={720} />
+          </Space>*/}
 
         </Content>
 
