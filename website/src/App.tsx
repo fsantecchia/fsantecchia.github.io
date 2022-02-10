@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Button, Card, Divider, Form, Layout, Image, Input, Space, Typography } from 'antd';
 
 import Editor from "react-simple-code-editor";
@@ -124,6 +124,18 @@ function App() {
 
             <Image src={exampleImage} width={1280} height={720} />
           </Space>*/}
+
+          <Space size="middle" align="center" direction="vertical">
+            <Typography.Title level={2}>
+              Command to run test locally
+            </Typography.Title>
+            <Typography.Text>
+              Replace 'FILE_PATH' and 'TEST_FILE_PATH'
+            </Typography.Text>
+            <Typography.Text>
+              node ./node_modules/.bin/jest --collectCoverage --coverageReporters=text --collectCoverageFrom=FILE_PATH TEST_FILE_PATH
+            </Typography.Text>
+          </Space>
 
         </Content>
 
