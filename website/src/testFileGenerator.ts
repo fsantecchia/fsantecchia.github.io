@@ -3,11 +3,14 @@ import {
   ConditionalExpression,
   ExportDefaultDeclaration,
   ExportNamedDeclaration,
-  Identifier,
+  // Identifier,
   BlockStatement,
   IfStatement,
-  Statement,
+  // Statement,
   TryStatement,
+  CallExpression,
+  ReturnStatement,
+  SwitchStatement
 } from "@babel/types";
 // @ts-ignore
 import babelPresetTypescript from '@babel/preset-typescript';
@@ -33,6 +36,8 @@ const TEMPLATE = ({
   import ${MODULE_NAME} from '../${MODULE_NAME}'
 
   const generateData = async () => {};
+
+  beforeEach(jest.clearAllMocks);
 
   ${TEST_CASES}
 `};
@@ -71,6 +76,88 @@ class Describe {
   }
 }
 
+class It {
+  constructor(description: string) {
+    this._description = description;
+  }
+
+  private _description: string;
+  private _lines: string[] = []
+  private _calledFunctionNames: string[] = []
+  private _comment: string = '';
+  private _hasReturnStatement: boolean = false;
+
+  addLine = (line: string) => {
+    this._lines.push(line);
+  }
+
+  addEmptyLine = () => {
+    this._lines.push(LINE_BREAK);
+  }
+
+  addComment = (comment: string) => {
+    this._comment = `/* ${comment} */ ${LINE_BREAK}`;
+  }
+
+  addReturnStatement = () => {
+    this._hasReturnStatement = true;
+  }
+
+  addCalledFunctionName = (functionName: string) => {
+    this._calledFunctionNames.push(functionName);
+  }
+
+  addExpectsForReturnStatement = () => {
+    if (this._hasReturnStatement) {
+      this._lines.push(`expect(result).toEqual(/* COMPLETE */)`);
+    }
+  }
+
+  addExpectsForCallExpressions = () => {
+    for (const functionName of this._calledFunctionNames) {
+      this._lines.push(`expect(${functionName}).toHaveBeenCalledTimes(1)`);
+      this._lines.push(`expect(${functionName}).toHaveBeenCalledWith(/* COMPLETE */)`);
+      this._lines.push(LINE_BREAK);
+    }
+  }
+
+  generateStructure = () => {
+    this._lines.push(`const mockData = await generateData();`);
+    this._lines.push(LINE_BREAK);
+    this._lines.push(getParamsAssigment());
+    this._lines.push(getFunctionCall(this._hasReturnStatement));
+    this._lines.push(LINE_BREAK);
+    this.addExpectsForReturnStatement();
+    this._lines.push(LINE_BREAK);
+    this.addExpectsForCallExpressions();
+    //this._lines.push('/* add expect() here */');
+  }
+
+  generateErrorStructure = () => {
+    this._lines.push(`expect.assertions(1);`);
+    this._lines.push(LINE_BREAK);
+    this._lines.push(`const mockData = await generateData();`);
+    this._lines.push(LINE_BREAK);
+    this._lines.push(`try {`);
+    this._lines.push(LINE_BREAK);
+    this._lines.push(getParamsAssigment());
+    this._lines.push(getFunctionCall(false));
+    this._lines.push(`} catch(error) {`);
+    this._lines.push(LINE_BREAK);
+    this.addExpectsForCallExpressions();
+    this._lines.push(`expect(error).toEqual(/* COMPLETE */)`);
+    //this._lines.push('/* add expect() here */');
+    this._lines.push(LINE_BREAK);
+    this._lines.push(`}`);
+  }
+
+  finish = () => {
+    return `${this._comment}it('${this._description}', ${APP.isAsync || true ? 'async' : ''} () => {
+      ${this._lines.join(LINE_BREAK)}
+    })`
+  }
+}
+
 class App {
   isAsync = true;
   modules: { declarationType: string;
@@ -86,11 +173,67 @@ class App {
   testSuite: Describe; // main Describe
   branches: Describe[] = [];
   tryCatchDescribe: Describe = new Describe(`error handling`);
+  mainIt = new It('should work as expected');
+  mainReturnStatement: NodePath<ReturnStatement> | null = null;
 }
 let APP = new App();
 
+// returs true when the block statement has at least 1 'ThrowStatement'
 const doesThrowError = (node: BlockStatement | null | undefined): boolean => {
   return Boolean(node && node.body.some((childNode) => childNode.type === 'ThrowStatement'));
+}
+
+// returs true when the path is part of the main logical branch
+const isInMainBranch = (path: NodePath): boolean => {
+  if (path.parentPath === null) {
+    return true;
+  }
+
+  if (path.parentPath.type === 'IfStatement' || path.parentPath.type === 'ConditionalExpression' || path.parentPath.type === 'CatchClause' || path.parentPath.type === 'SwitchStatement') {
+    return false;
+  }
+
+  return isInMainBranch(path.parentPath);
+}
+
+// returs true when the path is part of a VariableDeclarator
+const isInVariableDeclarator = (path: NodePath): boolean => {
+  if (path.parentPath === null) {
+    return false;
+  }
+
+  if (path.parentPath.type === 'VariableDeclarator' || path.parentPath.type === 'AssignmentExpression' || path.parentPath.type === 'ReturnStatement') {
+    return true;
+  }
+
+  return isInVariableDeclarator(path.parentPath);
+}
+
+// returs true when the path is part of a VariableDeclarator
+/* const isBlockStatementChildren = (path: NodePath): boolean => {
+  if (path.parentPath === null) {
+    return false;
+  }
+
+  if (path.parentPath.type === 'BlockStatement') {
+    return true;
+  }
+
+  if (path.parentPath.type === 'ExpressionStatement' && path.parentPath.parentPath && path.parentPath.parentPath.type === 'BlockStatement') {
+    return true;
+  }
+
+  if (path.parentPath.type === 'AwaitExpression' && path.parentPath.parentPath && path.parentPath.parentPath.type === 'ExpressionStatement' && path.parentPath.parentPath.parentPath && path.parentPath.parentPath.parentPath.type === 'BlockStatement') {
+    return true;
+  }
+
+  return false
+} */
+
+// capitalize string
+const capitalize = (s: string): string => {
+  if (typeof s !== 'string') return ''
+  return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 class LogicalBranchesGenerator {
@@ -177,9 +320,42 @@ class LogicalBranchesGenerator {
         it.addComment('optional test case');
       }
 
+      branch.blockStatement?.body.forEach((node) => {
+        if (node.type === 'ReturnStatement') {
+          it.addReturnStatement();
+        }
+
+        let callExpresion: CallExpression | null = null;
+
+        if (node.type === 'ExpressionStatement' && node.expression.type === 'CallExpression') {
+          callExpresion = node.expression;
+        } else if (node.type === 'ExpressionStatement' && node.expression.type === 'AwaitExpression' && node.expression.argument.type === 'CallExpression') {
+          callExpresion = node.expression.argument;
+        }
+
+        if (callExpresion) {
+          const { callee } = callExpresion;
+          // If callee is a variable/function
+          if (callee.type === 'Identifier') {
+            const functionName = callee.name + 'Spy';
+            it.addCalledFunctionName(functionName);
+
+          // if calle is a property of an object
+          } else if (callee.type === 'MemberExpression') {
+            if (callee.object.type === 'Identifier' && callee.property.type === 'Identifier') {
+              const functionName = `${callee.object.name}${capitalize(callee.property.name)}Spy`;
+              // const functionName = callee.property.name || 'ERROR';
+              it.addCalledFunctionName(functionName);
+            }
+          }
+        }
+      })
+
       if (doesThrowError(branch.blockStatement)) {
         it.generateErrorStructure();
       } else {
+        // console.log(branch.blockStatement);
+
         it.generateStructure();
       }
 
@@ -190,61 +366,6 @@ class LogicalBranchesGenerator {
 
   getDescribe = () => {
     return this._describe;
-  }
-}
-
-
-
-class It {
-  constructor(description: string) {
-    this._description = description;
-  }
-
-  private _description: string;
-  private _lines: string[] = []
-  private _comment: string = '';
-
-  addLine = (line: string) => {
-    this._lines.push(line);
-  }
-
-  addEmptyLine = () => {
-    this._lines.push(LINE_BREAK);
-  }
-
-  addComment = (comment: string) => {
-    this._comment = `/* ${comment} */ ${LINE_BREAK}`;
-  }
-
-  generateStructure = () => {
-    this._lines.push(`const mockData = await generateData();`);
-    this._lines.push(LINE_BREAK);
-    this._lines.push(getParamsAssigment());
-    this._lines.push(getFunctionCall());
-    this._lines.push(LINE_BREAK);
-    this._lines.push('/* add expect() here */');
-  }
-
-  generateErrorStructure = () => {
-    this._lines.push(`expect.assertions(1);`);
-    this._lines.push(LINE_BREAK);
-    this._lines.push(`const mockData = await generateData();`);
-    this._lines.push(LINE_BREAK);
-    this._lines.push(`try {`);
-    this._lines.push(LINE_BREAK);
-    this._lines.push(getParamsAssigment());
-    this._lines.push(getFunctionCall());
-    this._lines.push(`} catch(error) {`);
-    this._lines.push(LINE_BREAK);
-    this._lines.push('/* add expect() here */');
-    this._lines.push(LINE_BREAK);
-    this._lines.push(`}`);
-  }
-
-  finish = () => {
-    return `${this._comment}it('${this._description}', ${APP.isAsync || true ? 'async' : ''} () => {
-      ${this._lines.join(LINE_BREAK)}
-    })`
   }
 }
 
@@ -294,15 +415,15 @@ const getParamsAssigment = (): string => {
   })
 
   const formattedAssigments = params.map((paramName) => {
-    return `const ${paramName} = 'REPLACE';`
+    return `const ${paramName} = 'REPLACE'; /* REPLACE */`
   })
 
   return formattedAssigments.join(LINE_BREAK)
 }
 
 /* returns `const result = function(param1, param2);` */
-const getFunctionCall = (): string => {
-  return `const result = ${APP.isAsync ? 'await' : ''} ${APP.selectedModuleName}(${getParamsForFunction()});`;
+const getFunctionCall = (hasReturnStatement: boolean): string => {
+  return `${hasReturnStatement ? 'const result =' : ''} ${APP.isAsync ? 'await' : ''} ${APP.selectedModuleName}(${getParamsForFunction()});`;
 }
 
 /* returns Node related to `export default IDENTIFIER` */
@@ -434,9 +555,14 @@ const getNodes = () => {
           APP.branches.push(logicalBranchesGenerator.getDescribe());
         },
       },
+      SwitchStatement: {
+        enter: (path: NodePath<SwitchStatement>) => {
+          // TODO: work on this
+        },
+      },
       TryStatement: {
         enter: (path: NodePath<TryStatement>) => {
-          console.log(path);
+          // console.log(path);
           const itName = `should execute catch for try number ${APP.tryCatchDescribe.getTestCasesLength() + 1}`;
 
           const uniTestCase = new It(itName);
@@ -448,6 +574,48 @@ const getNodes = () => {
           }
 
           APP.tryCatchDescribe.addTestCase(uniTestCase);
+        },
+      },
+      CallExpression: {
+        enter: (path: NodePath<CallExpression>) => {
+          // console.log(path, !isInMainBranch(path), isInVariableDeclarator(path))
+
+          if (!isInMainBranch(path)) {
+            return;
+          }
+
+          if (isInVariableDeclarator(path)) {
+            return;
+          }
+
+          //console.log(path);
+
+          const { callee } = path.node;
+
+          // If callee is a variable/function
+          if (callee.type === 'Identifier') {
+            const functionName = callee.name + 'Spy';
+            APP.mainIt.addCalledFunctionName(functionName);
+
+          // if calle is a property of an object
+          } else if (callee.type === 'MemberExpression') {
+            if (callee.object.type === 'Identifier' && callee.property.type === 'Identifier') {
+              const functionName = `${callee.object.name}${capitalize(callee.property.name)}Spy`;
+              // const functionName = callee.property.name || 'ERROR';
+              APP.mainIt.addCalledFunctionName(functionName);
+            }
+          }
+        }
+      },
+      ReturnStatement: {
+        enter: (path: NodePath<ReturnStatement>) => {
+          //console.log(path, isInMainBranch(path))
+
+          if (!isInMainBranch(path)) {
+            return;
+          }
+
+          APP.mainReturnStatement = path;
         },
       },
     }
@@ -478,14 +646,6 @@ const buildTestFile = (sourceCode: string, functionName: string) => {
   APP.isAsync = typeof selectedModule.isAsync === 'boolean' ? selectedModule.isAsync : selectedModule.node.declaration.async;
   // APP.isAsync = true;
 
-  // Generate main describe
-  APP.testSuite = new Describe(`module ${APP.selectedModuleName}`)
-
-  // Generate first it()
-  const firstIt = new It('should work as expected')
-  firstIt.generateStructure();
-  APP.testSuite.addTestCase(firstIt);
-
   // Parse AST to string
   const codeToTransform = generate(selectedModule.node).code
 
@@ -494,6 +654,16 @@ const buildTestFile = (sourceCode: string, functionName: string) => {
     plugins: [getNodes],
     filename: './temp.ts'
   });
+
+  // Generate main describe
+  APP.testSuite = new Describe(`module ${APP.selectedModuleName}`)
+
+  // Generate it() for main branch
+  if (APP.mainReturnStatement) {
+    APP.mainIt.addReturnStatement();
+  }
+  APP.mainIt.generateStructure();
+  APP.testSuite.addTestCase(APP.mainIt);
 
   // Add describes
   APP.branches.map(APP.testSuite.addDiscribe);

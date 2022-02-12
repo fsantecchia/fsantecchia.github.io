@@ -139,7 +139,7 @@ function App() {
 
         </Content>
 
-        <Footer className="background-color">by Fabra 2021</Footer>
+        <Footer className="background-color">by Fabra</Footer>
       </Layout>
     </div>
   );
